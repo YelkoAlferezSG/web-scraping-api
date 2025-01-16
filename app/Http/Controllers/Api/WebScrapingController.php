@@ -67,43 +67,32 @@ class WebScrapingController extends Controller
 
     private function extractKeywordsFromBody($title, $bodyText)
     {
-        // Cargar la API Key desde el archivo .env
-        $apiKey = env('GOOGLE_API_KEY');
+        
+        $languageServiceClient = new LanguageServiceClient();
 
-        // Verificar si la API Key está configurada
-        if (!$apiKey) {
-            return response()->json([
-                'error' => 'La API Key de Google Cloud no está configurada correctamente.'
-            ], 500);
-        }
-
-        // Crear una instancia del cliente de Google con la API Key
-        $client = new Google_Client();
-        $client->setDeveloperKey($apiKey);
-
-        // Crear el servicio de lenguaje de Google
-        $language = new Google_Service_Language($client);
-
-        // Realizar un análisis de entidades sobre el texto del cuerpo
-        $document = new \Google_Service_Language_Document([
-            'content' => $bodyText,
-            'type' => 'PLAIN_TEXT',
+        // Prepara el documento
+        $document = new Document([
+            'content' => 'Fabricamos cinta fruncidora automática blanca para barras con presilla de hilos. Cinta fruncidora pasabarra muy práctica. Disponible en armadora y fruncidora automática. Cinta de cortina blanca o beige para cortina de barras de telas finas o transparentes, cortinas de decoración hogar, habitaciones infantiles, etc.',
+            'type' => Document\Type::PLAIN_TEXT
         ]);
-
-        $response = $language->documents->analyzeEntities($document);
-
-        // Inicializa el array de palabras clave
-        $keywords = [];
-
-        // Recorre las entidades extraídas del análisis
-        foreach ($response->getEntities() as $entity) {
-            // Filtra por entidades que tengan una alta relevancia (esto puede ajustarse según sea necesario)
-            if ($entity->getSalience() > 0.1) { // Umbral de saliencia
-                $keywords[] = $entity->getName();
-            }
+        
+        // Crea una instancia de Features y configura las propiedades
+        $features = new Features();
+        $features->setExtractEntities(true);  // Habilita la extracción de entidades
+        $features->setExtractDocumentSentiment(true);  // Habilita el análisis de sentimientos
+        // $features->setExtractSyntax(true);  // Habilita el análisis de sintaxis
+        
+        // Prepara la solicitud
+        $request = new AnnotateTextRequest();
+        $request->setDocument($document);
+        $request->setFeatures($features);
+        
+        // Llama a la API y maneja posibles errores
+        try {
+            $response = $languageServiceClient->annotateText($request);
+            return $response->serializeToJsonString();
+        } catch (ApiException $ex) {
+            printf('Call failed with message: %s' . PHP_EOL, $ex->getMessage());
         }
-
-        // Elimina duplicados en el array de keywords
-        return array_unique($keywords);
     }
 }
